@@ -8,13 +8,17 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020712}
 canvas{display:block}
 #phase{position:fixed;left:24px;bottom:20px;color:rgba(255,255,255,.7);font-family:Arial,sans-serif;font-size:13px;letter-spacing:.12em;pointer-events:none;text-shadow:0 1px 8px #000}
+#status{position:fixed;inset:0;display:grid;place-items:center;color:#dce9ff;font:14px Arial,sans-serif;letter-spacing:.08em;background:#020712;z-index:10;transition:opacity .5s ease}
 </style>
 </head>
 <body>
+<div id="status">LOADING SKY…</div>
 <div id="phase"></div>
-<script src="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script>
 (()=>{
+const status=document.querySelector('#status');
+try{
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,1000);
 camera.position.set(0,10,45);camera.lookAt(0,9,0);
@@ -46,9 +50,11 @@ const cloudTex=cloudTexture(),clouds=[];for(let i=0;i<7;i++){const material=new 
 const shootingGeo=new THREE.BufferGeometry();shootingGeo.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,-8,-3,0],3));const shootingMat=new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0});const shooting=new THREE.Line(shootingGeo,shootingMat);shooting.position.z=-55;scene.add(shooting);let nextShooting=0;
 function setMountainColors(t){mountains.forEach(m=>{const depth=m.index/mountains.length,col=new THREE.Color();if(t<.5)col.lerpColors(new THREE.Color(0x6789a6),new THREE.Color(0x234d55),depth);else if(t<.7)col.lerpColors(new THREE.Color(0x94768f),new THREE.Color(0x343350),depth);else col.lerpColors(new THREE.Color(0x304d75),new THREE.Color(0x071427),depth);m.mesh.material.color.copy(col);});}
 const phaseEl=document.querySelector('#phase');function phaseName(t){if(t<.10)return'새벽';if(t<.25)return'아침';if(t<.50)return'낮';if(t<.68)return'노을';if(t<.80)return'블루아워';return'밤'}
-function update(){const now=performance.now()/1000,t=timeline();skyMat.uniforms.uTime.value=t;phaseEl.textContent=phaseName(t);const sunVisible=1-smooth(.63,.70,t);sun.visible=sunVisible>.01;const angle=THREE.MathUtils.lerp(Math.PI*1.04,Math.PI*1.92,smooth(.06,.68,t));sun.position.x=Math.cos(angle)*68;sun.position.y=Math.sin(angle)*28+12;sunGlow.position.copy(sun.position);sunGlow.material.opacity=sunVisible*.52;let starOpacity=smooth(.70,.84,t);if(t>.97)starOpacity*=1-smooth(.97,1,t);stars.material.uniforms.uOpacity.value=starOpacity;stars.material.uniforms.uTime.value=now;let galaxyOpacity=smooth(.79,.90,t);if(t>.97)galaxyOpacity*=1-smooth(.97,1,t);galaxyWide.material.uniforms.uOpacity.value=galaxyOpacity*.42;galaxyCore.material.uniforms.uOpacity.value=galaxyOpacity*.88;galaxyGlow.material.opacity=galaxyOpacity*.72;galaxyWide.rotation.z=Math.sin(now*.035)*.004;galaxyCore.rotation.z=Math.sin(now*.035)*.004;clouds.forEach((cloud,i)=>{cloud.position.x+=.0025*(i+1);if(cloud.position.x>105)cloud.position.x=-105;let opacity=.15;if(t>.78)opacity=.08;if(t>.88)opacity=.11;cloud.material.opacity=opacity;});mists.forEach((mist,i)=>{mist.position.x+=.004+i*.0006;if(mist.position.x>70)mist.position.x=-70;mist.material.opacity=t>.72?.18:.12;});setMountainColors(t);forest.material.color.lerpColors(new THREE.Color(0x0f2c1f),new THREE.Color(0x02070a),smooth(.60,.85,t));if(t>.86&&now>nextShooting){nextShooting=now+7+Math.random()*14;shooting.position.set(THREE.MathUtils.randFloat(-45,70),THREE.MathUtils.randFloat(28,55),-55);shootingMat.opacity=1;}shooting.position.x+=.22;shooting.position.y-=.09;shootingMat.opacity*=.965;}
+function update(){const now=performance.now()/1000,t=timeline();skyMat.uniforms.uTime.value=t;phaseEl.textContent=phaseName(t);const sunVisible=1-smooth(.63,.70,t);sun.visible=sunVisible>.01;const sunT=smooth(.06,.68,t);sun.position.x=THREE.MathUtils.lerp(-68,68,sunT);sun.position.y=5+Math.sin(sunT*Math.PI)*34;sunGlow.position.copy(sun.position);sunGlow.material.opacity=sunVisible*.52;let starOpacity=smooth(.70,.84,t);if(t>.97)starOpacity*=1-smooth(.97,1,t);stars.material.uniforms.uOpacity.value=starOpacity;stars.material.uniforms.uTime.value=now;let galaxyOpacity=smooth(.79,.90,t);if(t>.97)galaxyOpacity*=1-smooth(.97,1,t);galaxyWide.material.uniforms.uOpacity.value=galaxyOpacity*.42;galaxyCore.material.uniforms.uOpacity.value=galaxyOpacity*.88;galaxyGlow.material.opacity=galaxyOpacity*.72;galaxyWide.rotation.z=Math.sin(now*.035)*.004;galaxyCore.rotation.z=Math.sin(now*.035)*.004;clouds.forEach((cloud,i)=>{cloud.position.x+=.0025*(i+1);if(cloud.position.x>105)cloud.position.x=-105;let opacity=.15;if(t>.78)opacity=.08;if(t>.88)opacity=.11;cloud.material.opacity=opacity;});mists.forEach((mist,i)=>{mist.position.x+=.004+i*.0006;if(mist.position.x>70)mist.position.x=-70;mist.material.opacity=t>.72?.18:.12;});setMountainColors(t);forest.material.color.lerpColors(new THREE.Color(0x0f2c1f),new THREE.Color(0x02070a),smooth(.60,.85,t));if(t>.86&&now>nextShooting){nextShooting=now+7+Math.random()*14;shooting.position.set(THREE.MathUtils.randFloat(-45,70),THREE.MathUtils.randFloat(28,55),-55);shootingMat.opacity=1;}shooting.position.x+=.22;shooting.position.y-=.09;shootingMat.opacity*=.965;}
 function animate(){requestAnimationFrame(animate);update();renderer.render(scene,camera)}animate();
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r')startTime=performance.now();});
+requestAnimationFrame(()=>{status.style.opacity='0';setTimeout(()=>status.remove(),600)});
+}catch(err){status.textContent='RENDER ERROR · '+err.message;console.error(err)}
 })();
 </script>
 </body>
