@@ -1,101 +1,106 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Demon Light Absorption v14</title>
-<style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:#2d1713;font:12px system-ui,-apple-system,"Segoe UI",sans-serif}
-#app{position:fixed;inset:0;background:#fff}
-canvas{display:block;width:100vw!important;height:100vh!important}
-#hud{position:fixed;left:14px;top:14px;z-index:10;padding:8px 10px;border:1px solid rgba(70,25,18,.13);border-radius:8px;background:rgba(255,255,255,.90);box-shadow:0 3px 18px rgba(0,0,0,.04);line-height:1.42;opacity:.52;transition:.2s}
-#hud:hover{opacity:1}
-#hud b{display:block;letter-spacing:.07em;color:#4b1711}
-#phase{color:#7e2b20}
-button{margin-top:6px;margin-right:5px;padding:5px 9px;border:1px solid rgba(90,30,20,.20);background:#fff;color:#3b201b;font:inherit;cursor:pointer}
-#error{display:none;position:fixed;inset:0;z-index:30;place-items:center;background:#fff;color:#8c1e13;font:14px system-ui;padding:24px;text-align:center}
-</style>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js"}}</script>
-</head>
-<body>
-<div id="app"></div>
-<div id="hud"><b>DEMON — LIGHT ABSORPTION v14</b><div id="phase">1. 공허</div><div id="stats">extracting exact reference dots…</div><button id="restart">Restart</button><button id="final">Final Form</button></div>
-<div id="error"></div>
-<script type="module">
-import * as THREE from 'three';
-
-const W=340,H=334,N=36000,TOTAL=20;
-const REF_PARTS=["demon_trace/v14ref3/part0.txt", "demon_trace/v14ref3/part1.txt", "demon_trace/v14ref3/part2.txt", "demon_trace/v14ref3/part3.txt", "demon_trace/v14ref3/part4.txt"];
-const REF='data:image/webp;base64,'+(await Promise.all(REF_PARTS.map(async p=>{const r=await fetch(p+'?v=14ref3',{cache:'no-store'});if(!r.ok)throw Error('REFERENCE '+p+' '+r.status);return (await r.text()).trim()}))).join('');
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Demon Particle Absorption v15</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;font:12px system-ui,-apple-system,"Segoe UI",sans-serif}#gl{position:fixed;inset:0;width:100%;height:100%;display:block;background:#fff}#hud{position:fixed;left:14px;top:14px;z-index:3;padding:9px 11px;border:1px solid rgba(70,18,12,.14);border-radius:9px;background:rgba(255,255,255,.88);box-shadow:0 5px 22px rgba(0,0,0,.04);color:#321713;line-height:1.42;opacity:.48;transition:.18s;backdrop-filter:blur(5px)}#hud:hover{opacity:1}#hud b{display:block;color:#561b14;letter-spacing:.07em;margin-bottom:2px}#phase{color:#9c2117}button{margin-top:7px;margin-right:5px;padding:5px 9px;border:1px solid rgba(95,25,18,.20);background:#fff;color:#3c211d;font:inherit;cursor:pointer}#error{display:none;position:fixed;inset:0;z-index:9;place-items:center;background:#fff;color:#8c1e13;text-align:center;padding:24px}</style></head><body><canvas id="gl"></canvas><div id="hud"><b>DEMON — ABSORPTION v15</b><div id="phase">1. 공허</div><div id="stats">sampling continuous particle field…</div><button id="restart">Restart</button><button id="final">Final Form</button></div><div id="error"></div><script>
+const COUNT=30000;
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
-const hash=(x,y)=>{const n=Math.sin(x*12.9898+y*78.233)*43758.5453;return n-Math.floor(n)};
+const canvas=document.getElementById('gl'),phaseEl=document.getElementById('phase'),statsEl=document.getElementById('stats'),errEl=document.getElementById('error');
 
-async function extract(){
-  const im=new Image();
-  await new Promise((ok,no)=>{im.onload=ok;im.onerror=()=>no(Error('REFERENCE DECODE ERROR'));im.src=REF});
-  const c=document.createElement('canvas');c.width=W;c.height=H;
-  const x=c.getContext('2d',{willReadFrequently:true});if(!x)throw Error('REFERENCE CANVAS ERROR');
-  x.drawImage(im,0,0,W,H);const d=x.getImageData(0,0,W,H).data;
-  const chosen=new Uint8Array(W*H),out=[];
-  const pick=(kind,quota)=>{
-    const a=[];
-    for(let yy=8;yy<H;yy++)for(let xx=0;xx<W;xx++){
-      const i=yy*W+xx;if(chosen[i])continue;const o=i*4,R=d[o],G=d[o+1],B=d[o+2];
-      const L=.2126*R+.7152*G+.0722*B, rd=R-Math.max(G,B);
-      let pass=false,score=0,cls=0;
-      if(kind===0){pass=rd>24&&R>75&&L<205;score=Math.max(0,rd)*1.8+(255-L)*.4;cls=2}
-      else if(kind===1){pass=L<105;score=Math.pow(Math.max(0,255-L),1.4);cls=rd>18&&R>70?1:0}
-      else if(kind===2){pass=L>=105&&L<180;score=Math.pow(Math.max(0,255-L),1.2)+Math.max(0,rd)*1.2;cls=rd>18&&R>70?1:0}
-      else {pass=L>=180&&L<235;score=Math.pow(Math.max(0,235-L),1.1)+Math.max(0,rd)*1.8;cls=rd>18&&R>70?1:0}
-      if(pass)a.push([score*(.72+.56*hash(xx,yy)),xx,yy,cls,L,rd]);
-    }
-    a.sort((p,q)=>q[0]-p[0]);
-    const m=Math.min(quota,a.length);
-    for(let k=0;k<m;k++){const p=a[k],idx=p[2]*W+p[1];chosen[idx]=1;out.push(p)}
-  };
-  pick(0,4500);pick(1,20000);pick(2,8500);pick(3,3000);
-  if(out.length<N)throw Error('REFERENCE POINT COUNT '+out.length);
-  if(out.length>N)out.length=N;
-  return out;
+async function loadReference(){
+  const parts=[0,1,2,3,4].map(i=>`demon_trace/v14ref3/part${i}.txt`);const ss=await Promise.all(parts.map(async p=>{const r=await fetch(p+'?v=15',{cache:'no-store'});if(!r.ok)throw Error('REFERENCE '+p+' '+r.status);return (await r.text()).trim()}));return imgDataFromBase64('data:image/webp;base64,'+ss.join(''));
 }
-
-async function main(){
-  const pts=await extract();
-  const scene=new THREE.Scene();scene.background=new THREE.Color(0xffffff);
-  const camera=new THREE.OrthographicCamera(-50,50,50,-50,.1,300);camera.position.set(0,0,120);camera.lookAt(0,0,0);
-  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',alpha:false});
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.35));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor(0xffffff,1);
-  document.getElementById('app').appendChild(renderer.domElement);
-
-  const target=new Float32Array(N*3),seed=new Float32Array(N),psize=new Float32Array(N),pclass=new Float32Array(N),intensity=new Float32Array(N);
-  for(let i=0;i<N;i++){
-    const p=pts[i],xx=p[1],yy=p[2],cls=p[3],L=p[4],rd=p[5],j=i*3;
-    const nx=(xx/(W-1)-.5)*2,ny=(.5-yy/(H-1))*2,se=hash(xx*3+cls*17,yy*5+i%97);
-    target[j]=nx*58;target[j+1]=ny*43.5-1;target[j+2]=(se-.5)*1.15;
-    seed[i]=se;pclass[i]=cls;intensity[i]=clamp(.55*((255-L)/255)+.45*(Math.max(0,rd)/255));
-    psize[i]=clamp(.25+.65*((255-L)/255)+(cls===2?.10:cls===1?.04:0));
+function imgDataFromBase64(src){
+  return new Promise((resolve,reject)=>{
+    const im=new Image();
+    im.onload=()=>{
+      const c=document.createElement('canvas'); c.width=im.width; c.height=im.height;
+      const x=c.getContext('2d',{willReadFrequently:true});
+      if(!x) return reject(Error('REFERENCE CANVAS ERROR'));
+      x.drawImage(im,0,0);
+      resolve({w:im.width,h:im.height,data:x.getImageData(0,0,im.width,im.height).data});
+    };
+    im.onerror=()=>reject(Error('REFERENCE DECODE ERROR'));
+    im.src=src;
+  });
+}
+function mulberry32(a){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+function buildField(ref){
+  const {w,h,data}=ref,n=w*h,dark=new Float32Array(n),red=new Float32Array(n),integ=new Float64Array((w+1)*(h+1));
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,o=i*4,R=data[o]/255,G=data[o+1]/255,B=data[o+2]/255,L=.2126*R+.7152*G+.0722*B;
+    dark[i]=1-L; red[i]=Math.max(0,R-.55*(G+B));
   }
-
-  const g=new THREE.BufferGeometry();
-  g.setAttribute('position',new THREE.BufferAttribute(target.slice(),3));g.setAttribute('aTarget',new THREE.BufferAttribute(target,3));
-  g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));g.setAttribute('aSize',new THREE.BufferAttribute(psize,1));
-  g.setAttribute('aClass',new THREE.BufferAttribute(pclass,1));g.setAttribute('aIntensity',new THREE.BufferAttribute(intensity,1));
-
-  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.NormalBlending,uniforms:{uTime:{value:0},uProgress:{value:0},uFade:{value:1},uPointScale:{value:1}},
-  vertexShader:`attribute vec3 aTarget;attribute float aSeed,aSize,aClass,aIntensity;uniform float uTime,uProgress,uFade,uPointScale;varying float vAlpha,vClass,vIntensity,vT;float sat(float x){return clamp(x,0.,1.);}float ease(float x){x=sat(x);return 1.-pow(1.-x,4.);}void main(){vec2 target=aTarget.xy;float rt=length(target),ang=atan(target.y,target.x);float delay=fract(aSeed*8.173+rt*.013)*.23+smoothstep(18.,74.,rt)*.055;float t=ease((uProgress-delay)/.62);float dir=step(.5,aSeed)*2.-1.;float spin=(1.-t)*dir*(4.5+aSeed*6.3);float sr=46.+rt*(1.30+aSeed*.72)+aSeed*28.;float rr=mix(sr,rt,t);vec2 p=vec2(cos(ang+spin),sin(ang+spin))*rr;float turb=1.-t;p+=vec2(sin(aSeed*71.+uTime*1.25+rr*.07),cos(aSeed*53.+uTime*1.05+rr*.06))*turb*(2.+aSeed*4.2);float settle=smoothstep(.91,1.,uProgress);p=mix(p,target,settle);float population=smoothstep(aSeed-.12,aSeed+.12,.11+.89*smoothstep(0.,.34,uProgress));vAlpha=population*mix(.08+.16*aIntensity,1.,t)*uFade;vClass=aClass;vIntensity=aIntensity;vT=t;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,aTarget.z,1.);gl_PointSize=(1.65+aSize*2.75+step(1.5,aClass)*.28)*uPointScale;}`,
-  fragmentShader:`varying float vAlpha,vClass,vIntensity,vT;void main(){vec2 q=gl_PointCoord-.5;float d=length(q);if(d>.5)discard;float core=1.-smoothstep(.10,.38,d);float edge=1.-smoothstep(.34,.50,d);vec3 charcoal=vec3(.055,.035,.033),maroon=vec3(.20,.028,.020),crimson=vec3(.78,.018,.010);vec3 fc=charcoal;if(vClass>.5)fc=maroon;if(vClass>1.5)fc=mix(vec3(.47,.018,.010),crimson,.55+.45*vIntensity);vec3 incoming=mix(vec3(.54,.50,.49),vec3(.40,.12,.09),step(.5,vClass));vec3 color=mix(incoming,fc,smoothstep(.18,.82,vT));color*=.86+core*.24;gl_FragColor=vec4(color,(core*.92+edge*.13)*vAlpha);}`});
-  scene.add(new THREE.Points(g,m));
-
-  function fit(){const a=innerWidth/Math.max(1,innerHeight),hh=50;camera.top=hh;camera.bottom=-hh;camera.left=-hh*a;camera.right=hh*a;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);m.uniforms.uPointScale.value=clamp(Math.sqrt((innerWidth*innerHeight)/(1600*900)),.78,1.22)}fit();addEventListener('resize',fit);
-
-  let sim=0,last=performance.now(),freeze=false;
-  const phase=p=>p<.06?'1. 공허':p<.30?'2. 빛 흡수':p<.56?'3. 실루엣 응축':p<.78?'4. 균열 점화':p<.96?'5. 형상 완성':'6. 최종 모습';
-  function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1000);last=now;if(!freeze)sim+=dt;let p=1,f=1;if(!freeze){if(sim<2.4)p=0;else if(sim<10.8)p=(sim-2.4)/8.4;else p=1;if(sim>16.5)f=clamp(1-(sim-16.5)/2.5,0,1);if(sim>=19.2){sim=0;p=0;f=1}}m.uniforms.uTime.value=sim;m.uniforms.uProgress.value=clamp(p);m.uniforms.uFade.value=f;document.getElementById('phase').textContent=freeze?'6. 최종 모습':phase(clamp(p));renderer.render(scene,camera)}requestAnimationFrame(frame);
-  document.getElementById('restart').onclick=()=>{sim=0;freeze=false;m.uniforms.uProgress.value=0;m.uniforms.uFade.value=1};
-  document.getElementById('final').onclick=()=>{freeze=true;m.uniforms.uProgress.value=1;m.uniforms.uFade.value=1;document.getElementById('phase').textContent='6. 최종 모습'};
-  document.getElementById('stats').textContent=N.toLocaleString()+' exact reference dots · unified inward absorption';
+  for(let y=0;y<h;y++){
+    let row=0;
+    for(let x=0;x<w;x++){row+=dark[y*w+x];integ[(y+1)*(w+1)+x+1]=integ[y*(w+1)+x+1]+row}
+  }
+  const box=(x,y,r)=>{
+    const x0=Math.max(0,x-r),x1=Math.min(w-1,x+r),y0=Math.max(0,y-r),y1=Math.min(h-1,y+r),W=w+1;
+    const s=integ[(y1+1)*W+x1+1]-integ[y0*W+x1+1]-integ[(y1+1)*W+x0]+integ[y0*W+x0];
+    return s/((x1-x0+1)*(y1-y0+1));
+  };
+  const d1=new Float32Array(n),d2=new Float32Array(n),edge=new Float32Array(n),weight=new Float32Array(n);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;d1[i]=box(x,y,2);d2[i]=box(x,y,5)}
+  let emax=.0001;
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x,gx=(d1[i+1]-d1[i-1])*.5,gy=(d1[i+w]-d1[i-w])*.5,e=Math.hypot(gx,gy);edge[i]=e;if(e>emax)emax=e}
+  for(let i=0;i<n;i++)edge[i]=Math.min(1,edge[i]/(emax*.55));
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,k=.08+.92*clamp((d2[i]-.008)/(.055-.008));
+    let ww=.40*Math.sqrt(d1[i])+.25*Math.sqrt(d2[i])+.18*dark[i]+.18*edge[i]+.34*red[i];
+    ww*=Math.max(k,clamp(red[i]*5));
+    if(y<10)ww=0;
+    weight[i]=ww;
+  }
+  return {w,h,dark,red,weight};
 }
-
-main().catch(e=>{console.error(e);const x=document.getElementById('error');x.style.display='grid';x.textContent='ERROR — '+e.message});
-</script>
-</body></html>
+function bilerp(a,w,h,x,y){
+  const x0=Math.floor(x),y0=Math.floor(y);if(x0<0||y0<0||x0>=w-1||y0>=h-1)return 0;
+  const fx=x-x0,fy=y-y0,i=y0*w+x0;
+  return ((a[i]*(1-fx)+a[i+1]*fx)*(1-fy)+(a[i+w]*(1-fx)+a[i+w+1]*fx)*fy);
+}
+function samplePoints(f){
+  const {w,h,weight,dark,red}=f,rng=mulberry32(0xD3A10F15),cell=.90,gw=Math.ceil(w/cell)+1,gh=Math.ceil(h/cell)+1,grid=new Int32Array(gw*gh);grid.fill(-1);
+  const px=new Float32Array(COUNT),py=new Float32Array(COUNT),tone=new Float32Array(COUNT),hot=new Float32Array(COUNT),size=new Float32Array(COUNT),seed=new Float32Array(COUNT);
+  let n=0,tries=0;
+  while(n<COUNT&&tries<1500000){
+    tries++;const x=1+rng()*(w-3),y=10+rng()*(h-12),wt=bilerp(weight,w,h,x,y),prob=Math.min(1,Math.pow(wt/.88,1.12));
+    if(rng()>prob)continue;
+    const md=.82+(1-Math.min(wt/.85,1))*.62,gx=Math.floor(x/cell),gy=Math.floor(y/cell);let ok=true;
+    for(let yy=Math.max(0,gy-3);yy<=Math.min(gh-1,gy+3)&&ok;yy++)for(let xx=Math.max(0,gx-3);xx<=Math.min(gw-1,gx+3);xx++){
+      const j=grid[yy*gw+xx];if(j<0)continue;const dx=px[j]-x,dy=py[j]-y;if(dx*dx+dy*dy<md*md){ok=false;break}
+    }
+    if(!ok)continue;
+    px[n]=x;py[n]=y;tone[n]=clamp(bilerp(dark,w,h,x,y));hot[n]=clamp(bilerp(red,w,h,x,y)*2.4);seed[n]=rng();size[n]=clamp(.16+.66*Math.sqrt(tone[n])+.18*seed[n]);grid[gy*gw+gx]=n;n++;
+  }
+  if(n<COUNT)throw Error('CONTINUOUS SAMPLE COUNT '+n);
+  const target=new Float32Array(COUNT*2);
+  for(let i=0;i<COUNT;i++){target[i*2]=px[i]/(w-1);target[i*2+1]=py[i]/(h-1)}
+  return {target,tone,hot,size,seed,tries};
+}
+function fail(msg){errEl.style.display='grid';errEl.textContent=msg}
+function fallback2D(P){
+  const x=canvas.getContext('2d');if(!x){fail('WEBGL / CANVAS UNAVAILABLE');return}
+  const dpr=Math.min(devicePixelRatio||1,1.25);canvas.width=innerWidth*dpr;canvas.height=innerHeight*dpr;x.scale(dpr,dpr);x.fillStyle='#fff';x.fillRect(0,0,innerWidth,innerHeight);
+  for(let i=0;i<COUNT;i+=2){
+    const xx=(.5+(P.target[i*2]-.5)*.86)*innerWidth,yy=(.5+(P.target[i*2+1]-.5)*.90)*innerHeight,H=P.hot[i];
+    x.fillStyle=H>.20?`rgb(${Math.floor(95+145*H)},8,5)`:'#140909';x.beginPath();x.arc(xx,yy,1.05+P.size[i]*1.75,0,Math.PI*2);x.fill();
+  }
+  phaseEl.textContent='6. 최종 모습 — 2D fallback';statsEl.textContent='15,000 continuous circular particles · 2D fallback';
+}
+function runWebGL(P){
+  const gl=canvas.getContext('webgl',{alpha:false,antialias:true,premultipliedAlpha:false,powerPreference:'high-performance'});
+  if(!gl){fallback2D(P);return}
+  const VS=`precision highp float;attribute vec2 aTarget;attribute float aTone,aHot,aSize,aSeed;uniform float uP,uT,uA,uDpr;varying float vTone,vHot,vMove,vSeed;void main(){vec2 tgt=vec2((aTarget.x-.5)*1.72,(.5-aTarget.y)*1.88);vec2 aq=vec2(tgt.x*uA,tgt.y);float tr=length(aq),ta=atan(aq.y,aq.x),delay=aSeed*.055,q=clamp((uP-delay)/max(.001,.90-delay),0.,1.),t=1.-pow(1.-q,4.),turns=1.05+1.75*aSeed,orad=1.02+.63*fract(aSeed*17.731)+tr*.06,ang=ta+(1.-t)*6.2831853*turns,rad=mix(orad,tr,t);vec2 orb=vec2(cos(ang),sin(ang))*rad,p=vec2(orb.x/uA,orb.y);float suc=(1.-t)*sin(uT*(.45+aSeed*.25)+aSeed*31.)*.012;p+=normalize(vec2(-p.y,p.x)+vec2(.0001))*suc;p=mix(p,tgt,smoothstep(.91,1.,uP));gl_Position=vec4(p,0.,1.);gl_PointSize=mix(2.35,5.65,aSize)*uDpr*mix(.62,1.,smoothstep(.18,.72,uP));vTone=aTone;vHot=aHot;vMove=t;vSeed=aSeed;}`;
+  const FS=`precision highp float;uniform float uP,uO;varying float vTone,vHot,vMove,vSeed;void main(){vec2 q=gl_PointCoord-.5;float d=length(q);if(d>.5)discard;float disc=1.-smoothstep(.38,.50,d),core=1.-smoothstep(.0,.30,d);vec3 pale=vec3(.76,.72,.70),charcoal=vec3(.035,.018,.016),maroon=vec3(.17,.018,.014),body=mix(charcoal,maroon,.12+.16*(1.-vTone));float darken=smoothstep(.14,.70,uP)*vMove;vec3 col=mix(pale,body,darken);float ignite=smoothstep(.58,.84,uP)*pow(vHot,.72);vec3 crack=mix(vec3(.42,.015,.008),vec3(.92,.025,.010),pow(vHot,.55));col=mix(col,crack,ignite*.94);float gate=smoothstep(vSeed*.16,vSeed*.16+.16,uP+.025),a=(.12+.88*darken)*gate*disc*uO;a*=mix(.65,1.,core);gl_FragColor=vec4(col,a);}`;
+  const shader=(t,s)=>{const z=gl.createShader(t);gl.shaderSource(z,s);gl.compileShader(z);if(!gl.getShaderParameter(z,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(z)||'SHADER');return z};
+  let prog;try{prog=gl.createProgram();gl.attachShader(prog,shader(gl.VERTEX_SHADER,VS));gl.attachShader(prog,shader(gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(prog)||'LINK')}catch(e){fail('WEBGL SHADER ERROR — '+e.message);return}
+  gl.useProgram(prog);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.disable(gl.DEPTH_TEST);
+  const bind=(name,data,k)=>{const l=gl.getAttribLocation(prog,name),b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,k,gl.FLOAT,false,0,0)};
+  bind('aTarget',P.target,2);bind('aTone',P.tone,1);bind('aHot',P.hot,1);bind('aSize',P.size,1);bind('aSeed',P.seed,1);
+  const uP=gl.getUniformLocation(prog,'uP'),uT=gl.getUniformLocation(prog,'uT'),uA=gl.getUniformLocation(prog,'uA'),uD=gl.getUniformLocation(prog,'uDpr'),uO=gl.getUniformLocation(prog,'uO');
+  let freeze=false,t0=performance.now(),elapsed=0;
+  const resize=()=>{const d=Math.min(devicePixelRatio||1,1.5),w=Math.max(1,Math.floor(innerWidth*d)),h=Math.max(1,Math.floor(innerHeight*d));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}gl.viewport(0,0,w,h);gl.uniform1f(uA,innerWidth/Math.max(1,innerHeight));gl.uniform1f(uD,d)};resize();addEventListener('resize',resize);
+  const phase=t=>freeze?'6. 최종 모습':t<2?'1. 공허':t<7?'2. 빛 흡수':t<11.5?'3. 실루엣 응축':t<15?'4. 균열 점화':t<18.5?'5. 형상 완성':'6. 최종 모습';
+  const draw=now=>{requestAnimationFrame(draw);if(!freeze){elapsed=(now-t0)/1000;if(elapsed>=26){t0=now;elapsed=0}}let q,o=1;if(freeze)q=1;else if(elapsed<2)q=0;else if(elapsed<18.5)q=(elapsed-2)/16.5;else q=1;if(!freeze&&elapsed>23)o=Math.max(0,1-(elapsed-23)/3);gl.clearColor(1,1,1,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.uniform1f(uP,clamp(q));gl.uniform1f(uT,now/1000);gl.uniform1f(uO,o);gl.drawArrays(gl.POINTS,0,COUNT);phaseEl.textContent=phase(elapsed)};requestAnimationFrame(draw);
+  document.getElementById('restart').onclick=()=>{freeze=false;t0=performance.now();elapsed=0};document.getElementById('final').onclick=()=>{freeze=true;elapsed=18.5};
+  statsEl.textContent=`30,000 continuous blue-noise round particles · ${P.tries.toLocaleString()} weighted candidates`;
+}
+(async()=>{try{const ref=await loadReference(),field=buildField(ref),P=samplePoints(field);runWebGL(P)}catch(e){console.error(e);fail('ERROR — '+e.message)}})();
+</script></body></html>
