@@ -1,14 +1,99 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demon Particle — Angel Method</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;font:11px system-ui;color:#ffd5cc}#app{position:fixed;inset:0}canvas{display:block;width:100vw!important;height:100vh!important}#load{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:#000;color:#a93625;letter-spacing:.13em}#hud{position:fixed;right:10px;top:10px;z-index:20;padding:9px 11px;border:1px solid #ff57352b;border-radius:8px;background:#090101c4;opacity:.22;transition:.2s}#hud:hover{opacity:1}button{margin-top:6px;margin-right:4px;background:#260504;color:#ffd5cc;border:1px solid #ff57353d;padding:5px 8px;border-radius:5px;cursor:pointer}</style><script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.161.0/examples/jsm/"}}</script></head><body><div id="app"></div><div id="load">DECODING REFERENCE TRACE…</div><div id="hud"><b>DEMON — REFERENCE TRACE</b><div id="phase">VOID</div><div>30,000 circular particles</div><button id="restart">Restart</button><button id="final">Final Form</button></div><script type="module">
-import * as THREE from 'three';import{EffectComposer}from'three/addons/postprocessing/EffectComposer.js';import{RenderPass}from'three/addons/postprocessing/RenderPass.js';import{UnrealBloomPass}from'three/addons/postprocessing/UnrealBloomPass.js';
-const COUNT=30000,TOTAL=46,MW=836,MH=471,RW=1672,RH=941,S=.0745,CX=836,CY=470,load=document.getElementById('load');
-try{load.textContent='LOADING EXACT REFERENCE TRACE…';const rr=await fetch('demon_trace/map_q60_b64.txt?v=angelmethod1',{cache:'no-store'});if(!rr.ok)throw Error('TRACE DATA '+rr.status);const b64=(await rr.text()).trim();if(!b64)throw Error('TRACE DATA MISSING');const im=new Image();await new Promise((ok,no)=>{im.onload=ok;im.onerror=()=>no(Error('TRACE IMAGE ERROR'));im.src='data:image/webp;base64,'+b64});const c=document.createElement('canvas');c.width=MW;c.height=MH;const x=c.getContext('2d',{willReadFrequently:true});if(!x)throw Error('CANVAS INIT ERROR');x.drawImage(im,0,0,MW,MH);const d=x.getImageData(0,0,MW,MH).data,raw=[];for(let yy=0;yy<MH;yy++)for(let xx=0;xx<MW;xx++){const v=d[(yy*MW+xx)*4];if(v>5)raw.push([xx*2+1,yy*2+1,v])}raw.sort((a,b)=>b[2]-a[2]);const pts=raw.slice();let k=0;while(pts.length<COUNT){const p=raw[k++%Math.min(raw.length,7000)],h=Math.sin(k*12.9898)*43758.5453,j=h-Math.floor(h),h2=Math.sin(k*78.233)*12345.678,j2=h2-Math.floor(h2);pts.push([p[0]+(j-.5)*2.2,p[1]+(j2-.5)*2.2,p[2]])}if(pts.length>COUNT)pts.length=COUNT;load.textContent='BUILDING 30,000 GPU POINTS…';
-const app=document.getElementById('app'),scene=new THREE.Scene();scene.background=new THREE.Color(0);scene.fog=new THREE.FogExp2(0x080100,.002);const cam=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.1,800);cam.position.set(0,0,145);cam.lookAt(0,0,0);const r=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.28;r.setPixelRatio(Math.min(devicePixelRatio||1,1.45));r.setSize(innerWidth,innerHeight);app.appendChild(r.domElement);const comp=new EffectComposer(r);comp.addPass(new RenderPass(scene,cam));const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),1.6,.82,.012);comp.addPass(bloom);
-const pos=new Float32Array(COUNT*3),tar=new Float32Array(COUNT*3),st=new Float32Array(COUNT*3),bu=new Float32Array(COUNT*3),co=new Float32Array(COUNT*3),sz=new Float32Array(COUNT),seed=new Float32Array(COUNT),reg=new Uint8Array(COUNT);const hash=n=>{const q=Math.sin(n*12.9898+78.233)*43758.5453;return q-Math.floor(q)};
-for(let i=0;i<COUNT;i++){const p=i*3,xx=pts[i][0],yy=pts[i][1],L=pts[i][2]/255,s=hash(i*1.731+9.17);tar[p]=(xx-CX)*S;tar[p+1]=(CY-yy)*S;tar[p+2]=(Math.sin(s*173)+Math.cos(s*91))*.62+(L-.45)*.35;reg[i]=(xx<735&&yy<835)?1:(xx>937&&yy<835)?2:(xx>700&&xx<972&&yy<355)?3:(xx>500&&xx<1172&&yy>245&&yy<875)?4:(yy>620)?5:6;seed[i]=s;const a=s*Math.PI*2,rr=10+Math.pow(hash(i*2.13),.55)*34;st[p]=Math.cos(a)*rr+(hash(i*3.1)-.5)*34;st[p+1]=(hash(i*7.7)-.5)*68;st[p+2]=Math.sin(a)*rr*.8+(hash(i*5.9)-.5)*30;const ba=hash(i*4.77)*Math.PI*2,br=18+Math.pow(hash(i*9.31),.55)*74;bu[p]=Math.cos(ba)*br+tar[p]*.12;bu[p+1]=(hash(i*6.21)-.5)*92+tar[p+1]*.1;bu[p+2]=Math.sin(ba)*br*.55+(hash(i*2.81)-.5)*22;let cr=.45+.55*Math.pow(L,.3),cg=.018+.35*Math.pow(L,1.45),cb=.008+.22*Math.pow(L,2);if(L>.58){cr=1;cg=.15+.58*L;cb=.06+.42*L}if(L>.86){cg=.72+.28*L;cb=.52+.46*L}co[p]=cr;co[p+1]=Math.min(1,cg);co[p+2]=Math.min(1,cb);sz[i]=.58+Math.pow(L,1.75)*1.9+(reg[i]===3?.22:0);pos[p]=st[p];pos[p+1]=st[p+1];pos[p+2]=st[p+2]}
-const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('color',new THREE.BufferAttribute(co,3));g.setAttribute('aSize',new THREE.BufferAttribute(sz,1));g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,vertexColors:true,blending:THREE.AdditiveBlending,uniforms:{uScale:{value:5.0},uTime:{value:0},uOpacity:{value:1}},vertexShader:`attribute float aSize,aSeed;varying vec3 vColor;uniform float uScale,uTime;void main(){vColor=color;vec4 mv=modelViewMatrix*vec4(position,1.);float tw=1.+sin(uTime*(1.+aSeed*.7)+aSeed*43.)*.07;gl_PointSize=aSize*uScale*tw*(120./max(1.,-mv.z));gl_Position=projectionMatrix*mv;}`,fragmentShader:`varying vec3 vColor;uniform float uOpacity;void main(){vec2 q=gl_PointCoord-.5;float d=length(q);if(d>.5)discard;float c=1.-smoothstep(.06,.42,d),h=1.-smoothstep(.22,.5,d);gl_FragColor=vec4(vColor*(.72+c*.76),(c*.76+h*.26)*uOpacity);}`});scene.add(new THREE.Points(g,m));
-const D=3600,dg=new THREE.BufferGeometry(),dp=new Float32Array(D*3),dc=new Float32Array(D*3),ds=new Float32Array(D),dseed=new Float32Array(D);for(let i=0;i<D;i++){const p=i*3,a=hash(i*5.3)*6.283,rr=35+hash(i*7.9)*100;dp[p]=Math.cos(a)*rr;dp[p+1]=(hash(i*3.2)-.5)*72;dp[p+2]=-12+hash(i*8.1)*32;dc[p]=.55+hash(i)*.45;dc[p+1]=.02+hash(i*2.1)*.12;dc[p+2]=.005+hash(i*3.7)*.04;ds[i]=.22+Math.pow(hash(i*11.7),4)*1.15;dseed[i]=hash(i*13.7)}dg.setAttribute('position',new THREE.BufferAttribute(dp,3));dg.setAttribute('color',new THREE.BufferAttribute(dc,3));dg.setAttribute('aSize',new THREE.BufferAttribute(ds,1));dg.setAttribute('aSeed',new THREE.BufferAttribute(dseed,1));const dm=m.clone();dm.uniforms={uScale:{value:3.4},uTime:{value:0},uOpacity:{value:.24}};scene.add(new THREE.Points(dg,dm));
-const clamp=v=>Math.max(0,Math.min(1,v)),smooth=(a,b,v)=>{let q=clamp((v-a)/(b-a));return q*q*(3-2*q)},ease=v=>1-Math.pow(1-clamp(v),4),lerp=(a,b,t)=>a+(b-a)*t,LSP=new THREE.Vector3((665-CX)*S,(CY-320)*S,0),RSP=new THREE.Vector3((1007-CX)*S,(CY-320)*S,0);function rot(x,y,a){const c=Math.cos(a),s=Math.sin(a);return[x*c-y*s,x*s+y*c]}let sim=0,last=performance.now(),freeze=false;
-function phase(t){return t<2.8?'VOID':t<6?'INFERNAL VORTEX':t<10.5?'LOWER ASH':t<14.5?'BODY FORMATION':t<17?'HEAD / HORNS':t<24?'WINGS FORMING':t<36?'FINAL FORM':'EMBER FADE'}
-function up(t,dt){const bt=smooth(.3,4.4,t),formed=smooth(18,25,t),flap=freeze?0:Math.sin(t*.55)*.024*formed,breathe=freeze?0:Math.sin(t*.72)*.09*formed;for(let i=0;i<COUNT;i++){const p=i*3,R=reg[i],s=seed[i];let tx=tar[p],ty=tar[p+1],tz=tar[p+2],f=freeze?1:R===5?ease(smooth(4.5,10.5,t)):R===4?ease(smooth(7,14.5,t)):R===3?ease(smooth(10.5,17,t)):(R===1||R===2)?ease(smooth(13.5,24,t)):ease(smooth(2.8,20,t));if(R===1||R===2){const P=R===1?LSP:RSP;let dx=tx-P.x,dy=ty-P.y,u=clamp(Math.hypot(dx,dy)/78),aa=(R===1?-1:1)*flap*(.25+.75*u);[dx,dy]=rot(dx,dy,aa);tx=P.x+dx;ty=P.y+dy;if(!freeze){ty+=Math.sin(t*.9+s*9)*u*.13;tz+=Math.sin(t*.72+s*7)*u*.9}}else if(R===4&&!freeze){ty+=breathe*.1;tx+=Math.sin(t*.42+s*6)*.025}else if(R===5&&!freeze){let u=clamp((-ty+38)/62);tx+=Math.sin(t*.84+s*10)*(.1+u*.6);ty+=Math.cos(t*.68+s*8)*(.06+u*.26)}const sx=lerp(st[p],bu[p],bt),sy=lerp(st[p+1],bu[p+1],bt),sz=lerp(st[p+2],bu[p+2],bt),sw=(1-f)*Math.sin(t*1.8+s*22)*5,ca=Math.cos(sw*.028),sa=Math.sin(sw*.028),qx=sx*ca-sz*sa,qz=sx*sa+sz*ca;pos[p]=lerp(qx,tx,f);pos[p+1]=lerp(sy,ty,f);pos[p+2]=lerp(qz,tz,f)}g.attributes.position.needsUpdate=true;m.uniforms.uTime.value=t;m.uniforms.uOpacity.value=.67+formed*.33;dm.uniforms.uTime.value=t;const a=dg.attributes.position.array;for(let i=0;i<D;i++){a[i*3+1]+=dt*(.05+dseed[i]*.13);if(a[i*3+1]>52)a[i*3+1]=-52}dg.attributes.position.needsUpdate=true;cam.position.x=freeze?0:Math.sin(t*.055)*.7*formed;cam.position.y=freeze?0:Math.sin(t*.07)*.24;cam.position.z=145;cam.lookAt(0,0,0)}
-function loop(now){requestAnimationFrame(loop);const dt=Math.min(.05,(now-last)/1000);last=now;if(!freeze){sim+=dt;if(sim>=TOTAL)sim=0}up(sim,dt);document.getElementById('phase').textContent=freeze?'FINAL FORM — EXACT TARGET':phase(sim);comp.render()}requestAnimationFrame(loop);document.getElementById('restart').onclick=()=>{sim=0;freeze=false};document.getElementById('final').onclick=()=>{sim=25;freeze=true};addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);comp.setSize(innerWidth,innerHeight)});load.remove()}catch(e){console.error(e);load.textContent='ERROR — '+e.message}
-</script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Demon Exact Trace v11</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#d9b8b0;font:11px system-ui,-apple-system,"Segoe UI",sans-serif}
+body{background:radial-gradient(ellipse at 50% 54%,#0b0101 0%,#030000 44%,#000 80%)}
+#app{position:fixed;inset:0}canvas{display:block;width:100vw!important;height:100vh!important}
+#load{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:#000;color:#b64c38;letter-spacing:.14em;text-align:center}
+#hud{position:fixed;left:12px;top:12px;z-index:20;padding:9px 11px;border:1px solid #ff5e442b;border-radius:7px;background:#090101b8;opacity:.22;transition:.2s;backdrop-filter:blur(5px);line-height:1.45}
+#hud:hover{opacity:1}#hud b{display:block;color:#ff745b;letter-spacing:.07em}#phase{color:#e4a093}
+button{margin-top:7px;margin-right:5px;padding:5px 9px;border:1px solid #ff563b38;background:#190403;color:#dec0b8;font:inherit;cursor:pointer}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.161.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="load">LOADING EXACT REFERENCE COORDINATES…</div>
+<div id="hud"><b>DEMON — EXACT TRACE v11</b><div id="phase">VOID</div><div id="stats">reference pixels → circular GPU particles</div><button id="restart">Restart</button><button id="final">Final Form</button></div>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+const RW=1672,RH=941,TARGET_COUNT=39500,TOTAL=42;
+const load=document.getElementById('load'),phaseEl=document.getElementById('phase'),stats=document.getElementById('stats');
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const hash=n=>{const x=Math.sin(n*12.9898+78.233)*43758.5453;return x-Math.floor(x)};
+
+try{
+  load.textContent='LOADING 39,500-POINT TRACE MAP…';
+  const files=['demon_trace/v11q40/part0.txt','demon_trace/v11q40/part1.txt','demon_trace/v11q40/part2.txt','demon_trace/v11q40/part3.txt','demon_trace/v11q40/part4.txt','demon_trace/v11q40/part5.txt'];
+  const parts=await Promise.all(files.map(async p=>{const r=await fetch(p+'?v=11q40',{cache:'no-store'});if(!r.ok)throw Error(p+' '+r.status);return r.text()}));
+  const src='data:image/webp;base64,'+parts.join('').trim();
+  const im=new Image();await new Promise((ok,no)=>{im.onload=ok;im.onerror=()=>no(Error('TRACE MAP DECODE ERROR'));im.src=src});
+  const cv=document.createElement('canvas');cv.width=RW;cv.height=RH;const cx=cv.getContext('2d',{willReadFrequently:true});if(!cx)throw Error('TRACE CANVAS ERROR');
+  cx.clearRect(0,0,RW,RH);cx.drawImage(im,0,0,RW,RH);const d=cx.getImageData(0,0,RW,RH).data;
+  const raw=[];
+  for(let y=0;y<RH;y++)for(let x=0;x<RW;x++){
+    const o=(y*RW+x)*4,a=d[o+3];if(a<8)continue;
+    const reg=clamp(Math.round((a-24)/32),0,6),r=d[o],g=d[o+1],b=d[o+2];
+    raw.push({x,y,r,g,b,reg});
+  }
+  if(raw.length<25000)throw Error('TRACE POINT COUNT TOO LOW '+raw.length);
+  const pts=raw.slice();
+  const priority=raw.filter(p=>p.reg>0).sort((a,b)=>((b.r+b.g+b.b)-(a.r+a.g+a.b)));
+  let kk=0;
+  while(pts.length<TARGET_COUNT){const p=priority[kk++%priority.length],j=hash(kk*3.1),j2=hash(kk*7.9);pts.push({...p,x:p.x+(j-.5)*1.15,y:p.y+(j2-.5)*1.15});}
+  if(pts.length>TARGET_COUNT)pts.length=TARGET_COUNT;
+  load.textContent='BUILDING 39,500 ROUND GPU PARTICLES…';
+
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0x000000);scene.fog=new THREE.FogExp2(0x050000,.0010);
+  const cam=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.1,700);cam.position.set(0,0,110);cam.lookAt(0,-1,0);
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',alpha:false});
+  renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.90;renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.35));renderer.setSize(innerWidth,innerHeight);document.getElementById('app').appendChild(renderer.domElement);
+  const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,cam));const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.52,.32,.24);bloom.threshold=.08;bloom.strength=.52;bloom.radius=.34;composer.addPass(bloom);
+
+  function roundTexture(size=96){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');const g=x.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.22,'rgba(255,255,255,.98)');g.addColorStop(.55,'rgba(255,255,255,.68)');g.addColorStop(.80,'rgba(255,255,255,.22)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,size,size);const t=new THREE.CanvasTexture(c);t.minFilter=THREE.LinearFilter;t.magFilter=THREE.LinearFilter;return t}
+  const tex=roundTexture();
+
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;for(const p of pts)if(p.reg){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)}
+  const centerX=(minX+maxX)*.5,centerY=(minY+maxY)*.5,S=.102;
+  const N=pts.length,pos=new Float32Array(N*3),start=new Float32Array(N*3),target=new Float32Array(N*3),col=new Float32Array(N*3),size=new Float32Array(N),seed=new Float32Array(N),region=new Float32Array(N);
+  let wminx=1e9,wmaxx=-1e9,wminy=1e9,wmaxy=-1e9;
+  for(let i=0;i<N;i++){
+    const p=pts[i],j=i*3,reg=p.reg,s=hash(i*1.731+p.x*.013+p.y*.021),tx=(p.x-centerX)*S,ty=(centerY-p.y)*S-1.8,tz=(hash(i*2.7)-.5)*1.15;
+    target[j]=tx;target[j+1]=ty;target[j+2]=tz;if(reg){wminx=Math.min(wminx,tx);wmaxx=Math.max(wmaxx,tx);wminy=Math.min(wminy,ty);wmaxy=Math.max(wmaxy,ty)}
+    const a=s*Math.PI*2,h1=hash(i*1.71),h2=hash(i*3.93),h3=hash(i*7.17);let sx,sy,sz;
+    if(reg===0){sx=tx+(h1-.5)*7;sy=ty+(h2-.5)*7;sz=tz+(h3-.5)*5}
+    else if(reg===1){sx=(h1-.5)*28;sy=-61-h2*28;sz=(h3-.5)*28}
+    else if(reg===2){const rr=18+Math.pow(h1,.55)*43;sx=Math.cos(a)*rr;sy=(h2-.5)*62;sz=Math.sin(a)*rr*.55+(h3-.5)*16}
+    else if(reg===3){const rr=12+Math.pow(h1,.6)*38;sx=Math.cos(a)*rr;sy=52+h2*32;sz=Math.sin(a)*rr*.55}
+    else if(reg===4){const side=tx<0?-1:1;sx=side*11+(h1-.5)*18;sy=13+(h2-.5)*17;sz=(h3-.5)*14}
+    else if(reg===5){const side=tx<0?-1:1;sx=side*(18+h1*60);sy=10+(h2-.5)*65;sz=(h3-.5)*24}
+    else {const rr=5+h1*24;sx=Math.cos(a)*rr;sy=(h2-.5)*37;sz=Math.sin(a)*rr*.6}
+    start[j]=pos[j]=sx;start[j+1]=pos[j+1]=sy;start[j+2]=pos[j+2]=sz;
+    let cr=p.r/255,cg=p.g/255,cb=p.b/255;const L=(p.r*.2126+p.g*.7152+p.b*.0722)/255;
+    if(reg===6){cr*=.84;cg*=.80;cb*=.76}else if(reg===5){cr*=.72;cg*=.68;cb*=.66}else if(reg===4){cr=Math.min(1,cr*.86+.045);cg*=.78;cb*=.74}else if(reg===2||reg===3){cr=Math.max(cr*.72,.15);cg=Math.max(cg*.68,.028);cb=Math.max(cb*.66,.020)}else if(reg===1){cr=Math.max(cr*.70,.11);cg*=.68;cb*=.64}
+    col[j]=clamp(cr);col[j+1]=clamp(cg);col[j+2]=clamp(cb);
+    let z=.70+Math.pow(L,1.25)*1.45;if(reg===3)z+=.18;if(reg===4)z+=.12;if(reg===5)z-=.10;if(reg===6)z-=.14;size[i]=Math.max(.62,z);seed[i]=s;region[i]=reg;
+  }
+  const bboxW=wmaxx-wminx,bboxH=wmaxy-wminy;
+  function fitCamera(){const aspect=innerWidth/innerHeight,fov=THREE.MathUtils.degToRad(cam.fov),zH=(bboxH*.5)/(Math.tan(fov*.5)*.945),zW=(bboxW*.5)/(Math.tan(fov*.5)*aspect*.985);cam.position.z=Math.max(zH,zW,76);cam.aspect=aspect;cam.updateProjectionMatrix()};fitCamera();
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('aStart',new THREE.BufferAttribute(start,3));geo.setAttribute('aTarget',new THREE.BufferAttribute(target,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setAttribute('aSize',new THREE.BufferAttribute(size,1));geo.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));geo.setAttribute('aRegion',new THREE.BufferAttribute(region,1));
+  const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,vertexColors:true,blending:THREE.NormalBlending,uniforms:{uMap:{value:tex},uTime:{value:0},uProgress:{value:0},uPointScale:{value:4.25},uOpacity:{value:.97},uFade:{value:1}},vertexShader:`attribute vec3 aStart,aTarget;attribute float aSize,aSeed,aRegion;varying vec3 vColor;varying float vAlpha;uniform float uTime,uProgress,uPointScale,uFade;float sat(float x){return clamp(x,0.,1.);}float ease(float x){x=sat(x);return 1.-pow(1.-x,4.);}float stage(float a,float b){return ease((uProgress-a)/max(.0001,b-a));}void main(){float a=.04,b=.96;if(aRegion<.5){a=.02;b=.17;}else if(aRegion<1.5){a=.18;b=.38;}else if(aRegion<2.5){a=.31;b=.56;}else if(aRegion<3.5){a=.45;b=.66;}else if(aRegion<4.5){a=.58;b=.77;}else if(aRegion<5.5){a=.68;b=.90;}else{a=.82;b=.97;}float t=stage(a,b);vec3 dir=aTarget-aStart;vec3 perp=normalize(vec3(-dir.y,dir.x,.001));float arc=sin(t*3.14159265)*(1.-t),sw=sin(aSeed*31.7+uTime*.42+t*8.)*arc*(1.5+4.2*aSeed);vec3 p=mix(aStart,aTarget,t)+perp*sw;float unsettled=1.-smoothstep(.91,1.,uProgress);if(aRegion<.5)p+=vec3(sin(uTime*.35+aSeed*23.)*.32,cos(uTime*.27+aSeed*17.)*.32,0.);else p+=vec3(sin(uTime*.9+aSeed*29.)*.075,cos(uTime*.75+aSeed*19.)*.075,0.)*unsettled;float settle=smoothstep(.94,1.,uProgress);if(aRegion>.5)p=mix(p,aTarget,settle);vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;gl_PointSize=max(3.0,aSize*uPointScale*(116./max(1.,-mv.z)));vColor=color;vAlpha=(aRegion<.5?(.26+.28*sin(uTime*.7+aSeed*40.)):t)*uFade;}`,fragmentShader:`uniform sampler2D uMap,uOpacity;varying vec3 vColor;varying float vAlpha;void main(){vec4 t=texture2D(uMap,gl_PointCoord);if(t.a<.018)discard;float core=smoothstep(.24,.92,t.a);vec3 c=vColor*(.72+core*.42);gl_FragColor=vec4(c,t.a*vAlpha*uOpacity);}`});
+  scene.add(new THREE.Points(geo,mat));
+  load.remove();stats.textContent=N.toLocaleString()+' exact-coordinate circular particles';
+  let sim=0,last=performance.now(),freeze=false;
+  const getPhase=p=>p<.08?'VOID':p<.18?'ANOMALY / VORTEX':p<.32?'LOWER BODY':p<.46?'TORSO':p<.58?'HEAD / HORNS':p<.69?'WING STRUCTURE':p<.84?'WING MEMBRANE':p<.96?'EMBER CORE':'FINAL FORM';
+  function animate(now){requestAnimationFrame(animate);const dt=Math.min(.05,(now-last)/1000);last=now;if(!freeze){sim+=dt;if(sim>TOTAL)sim=0}const p=freeze?1:clamp(sim/32,0,1);mat.uniforms.uTime.value=sim;mat.uniforms.uProgress.value=p;let fade=1;if(!freeze&&sim>36)fade=1-(sim-36)/6*.76;mat.uniforms.uFade.value=clamp(fade,.24,1);phaseEl.textContent=freeze?'FINAL FORM — EXACT TARGET':getPhase(p);composer.render()}
+  requestAnimationFrame(animate);
+  document.getElementById('restart').onclick=()=>{sim=0;freeze=false;mat.uniforms.uFade.value=1};document.getElementById('final').onclick=()=>{freeze=true;mat.uniforms.uProgress.value=1;mat.uniforms.uFade.value=1;phaseEl.textContent='FINAL FORM — EXACT TARGET'};
+  addEventListener('resize',()=>{renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.35));renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);fitCamera()});
+}catch(e){console.error(e);load.textContent='TRACE ERROR — '+e.message}
+</script>
+</body></html>
