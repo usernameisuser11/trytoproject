@@ -1,13 +1,101 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demon White Trace v13</title><style>html,body{margin:0;width:100%;height:100%;background:#fff;color:#261310;font:13px system-ui}#s{position:fixed;inset:0;display:grid;place-items:center;background:#fff;color:#5c241c;letter-spacing:.12em}</style></head><body><div id="s">BUILDING WHITE BACKGROUND PARTICLE DEMON…</div><script>(async()=>{try{const u='https://raw.githubusercontent.com/usernameisuser11/trytoproject/dfd2c3b880b54a5bb89f2085dc12b17537c2dc46/index.html';const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw Error('SOURCE '+r.status);let h=await r.text();
-// white UI/background
-h=h.replaceAll('background:#000','background:#fff').replaceAll('background:#090101b8','background:#fffffff0').replaceAll('color:#d8aaa1','color:#3a211d').replaceAll('color:#a74232','color:#6f2417').replaceAll('color:#ff745b','color:#7e2418').replaceAll('color:#db9385','color:#64312a').replaceAll('background:#160302','background:#fff7f5').replaceAll('color:#dbb9b1','color:#3d211d');
-// renderer/background/fog/tone/bloom
-h=h.replace('scene.background=new THREE.Color(0);scene.fog=new THREE.FogExp2(0x050000,.00065);','scene.background=new THREE.Color(0xffffff);scene.fog=new THREE.FogExp2(0xffffff,.00035);');
-h=h.replace('renderer.toneMappingExposure=1;','renderer.toneMappingExposure=.84;');
-h=h.replace('const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.40,.28,.14);bloom.threshold=.14;bloom.strength=.40;bloom.radius=.28;','const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.06,.08,.72);bloom.threshold=.72;bloom.strength=.06;bloom.radius=.08;');
-// pass region to fragment shader and remap colors for white background
-h=h.replace('varying vec3 vColor;varying float vAlpha;uniform float uTime,uProgress,uPointScale,uFade;','varying vec3 vColor;varying float vAlpha;varying float vRegion;uniform float uTime,uProgress,uPointScale,uFade;');
-h=h.replace('vColor=color;vAlpha=t*uFade;}`','vColor=color;vRegion=aRegion;vAlpha=t*uFade;}`');
-h=h.replace(/fragmentShader:`varying vec3 vColor;varying float vAlpha;uniform float uOpacity;void main\(\)\{[\s\S]*?\}`\}\);scene\.add/,`fragmentShader:\`varying vec3 vColor;varying float vAlpha;varying float vRegion;uniform float uOpacity;void main(){vec2 q=gl_PointCoord-.5;float d=length(q);if(d>.5)discard;float core=1.-smoothstep(.04,.27,d);float edge=1.-smoothstep(.28,.50,d);float src=max(vColor.r,max(vColor.g,vColor.b));vec3 dark=vec3(.055,.028,.026);vec3 deepRed=vec3(.25,.035,.025);vec3 hotRed=vec3(.82,.045,.025);float hot=smoothstep(.45,.95,src);vec3 c=(vRegion>4.5)?mix(deepRed,hotRed,hot):mix(dark,deepRed,hot*.42);float a=(core*.96+edge*.18)*vAlpha*uOpacity;gl_FragColor=vec4(c,a);}\`});scene.add`);
-h=h.replace('DEMON — FULL TRACE v12','DEMON — WHITE TRACE v13').replace('Demon Full Silhouette Trace v12','Demon White Trace v13');
-document.open();document.write(h);document.close()}catch(e){document.getElementById('s').textContent='ERROR — '+e.message;console.error(e)}})();</script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Demon Light Absorption v14</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff;color:#2d1713;font:12px system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{position:fixed;inset:0;background:#fff}
+canvas{display:block;width:100vw!important;height:100vh!important}
+#hud{position:fixed;left:14px;top:14px;z-index:10;padding:8px 10px;border:1px solid rgba(70,25,18,.13);border-radius:8px;background:rgba(255,255,255,.90);box-shadow:0 3px 18px rgba(0,0,0,.04);line-height:1.42;opacity:.52;transition:.2s}
+#hud:hover{opacity:1}
+#hud b{display:block;letter-spacing:.07em;color:#4b1711}
+#phase{color:#7e2b20}
+button{margin-top:6px;margin-right:5px;padding:5px 9px;border:1px solid rgba(90,30,20,.20);background:#fff;color:#3b201b;font:inherit;cursor:pointer}
+#error{display:none;position:fixed;inset:0;z-index:30;place-items:center;background:#fff;color:#8c1e13;font:14px system-ui;padding:24px;text-align:center}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js"}}</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud"><b>DEMON — LIGHT ABSORPTION v14</b><div id="phase">1. 공허</div><div id="stats">extracting exact reference dots…</div><button id="restart">Restart</button><button id="final">Final Form</button></div>
+<div id="error"></div>
+<script type="module">
+import * as THREE from 'three';
+
+const W=340,H=334,N=36000,TOTAL=20;
+const REF_PARTS=["demon_trace/v14ref3/part0.txt", "demon_trace/v14ref3/part1.txt", "demon_trace/v14ref3/part2.txt", "demon_trace/v14ref3/part3.txt", "demon_trace/v14ref3/part4.txt"];
+const REF='data:image/webp;base64,'+(await Promise.all(REF_PARTS.map(async p=>{const r=await fetch(p+'?v=14ref3',{cache:'no-store'});if(!r.ok)throw Error('REFERENCE '+p+' '+r.status);return (await r.text()).trim()}))).join('');
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const hash=(x,y)=>{const n=Math.sin(x*12.9898+y*78.233)*43758.5453;return n-Math.floor(n)};
+
+async function extract(){
+  const im=new Image();
+  await new Promise((ok,no)=>{im.onload=ok;im.onerror=()=>no(Error('REFERENCE DECODE ERROR'));im.src=REF});
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d',{willReadFrequently:true});if(!x)throw Error('REFERENCE CANVAS ERROR');
+  x.drawImage(im,0,0,W,H);const d=x.getImageData(0,0,W,H).data;
+  const chosen=new Uint8Array(W*H),out=[];
+  const pick=(kind,quota)=>{
+    const a=[];
+    for(let yy=8;yy<H;yy++)for(let xx=0;xx<W;xx++){
+      const i=yy*W+xx;if(chosen[i])continue;const o=i*4,R=d[o],G=d[o+1],B=d[o+2];
+      const L=.2126*R+.7152*G+.0722*B, rd=R-Math.max(G,B);
+      let pass=false,score=0,cls=0;
+      if(kind===0){pass=rd>24&&R>75&&L<205;score=Math.max(0,rd)*1.8+(255-L)*.4;cls=2}
+      else if(kind===1){pass=L<105;score=Math.pow(Math.max(0,255-L),1.4);cls=rd>18&&R>70?1:0}
+      else if(kind===2){pass=L>=105&&L<180;score=Math.pow(Math.max(0,255-L),1.2)+Math.max(0,rd)*1.2;cls=rd>18&&R>70?1:0}
+      else {pass=L>=180&&L<235;score=Math.pow(Math.max(0,235-L),1.1)+Math.max(0,rd)*1.8;cls=rd>18&&R>70?1:0}
+      if(pass)a.push([score*(.72+.56*hash(xx,yy)),xx,yy,cls,L,rd]);
+    }
+    a.sort((p,q)=>q[0]-p[0]);
+    const m=Math.min(quota,a.length);
+    for(let k=0;k<m;k++){const p=a[k],idx=p[2]*W+p[1];chosen[idx]=1;out.push(p)}
+  };
+  pick(0,4500);pick(1,20000);pick(2,8500);pick(3,3000);
+  if(out.length<N)throw Error('REFERENCE POINT COUNT '+out.length);
+  if(out.length>N)out.length=N;
+  return out;
+}
+
+async function main(){
+  const pts=await extract();
+  const scene=new THREE.Scene();scene.background=new THREE.Color(0xffffff);
+  const camera=new THREE.OrthographicCamera(-50,50,50,-50,.1,300);camera.position.set(0,0,120);camera.lookAt(0,0,0);
+  const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.35));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.setClearColor(0xffffff,1);
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const target=new Float32Array(N*3),seed=new Float32Array(N),psize=new Float32Array(N),pclass=new Float32Array(N),intensity=new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const p=pts[i],xx=p[1],yy=p[2],cls=p[3],L=p[4],rd=p[5],j=i*3;
+    const nx=(xx/(W-1)-.5)*2,ny=(.5-yy/(H-1))*2,se=hash(xx*3+cls*17,yy*5+i%97);
+    target[j]=nx*58;target[j+1]=ny*43.5-1;target[j+2]=(se-.5)*1.15;
+    seed[i]=se;pclass[i]=cls;intensity[i]=clamp(.55*((255-L)/255)+.45*(Math.max(0,rd)/255));
+    psize[i]=clamp(.25+.65*((255-L)/255)+(cls===2?.10:cls===1?.04:0));
+  }
+
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(target.slice(),3));g.setAttribute('aTarget',new THREE.BufferAttribute(target,3));
+  g.setAttribute('aSeed',new THREE.BufferAttribute(seed,1));g.setAttribute('aSize',new THREE.BufferAttribute(psize,1));
+  g.setAttribute('aClass',new THREE.BufferAttribute(pclass,1));g.setAttribute('aIntensity',new THREE.BufferAttribute(intensity,1));
+
+  const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.NormalBlending,uniforms:{uTime:{value:0},uProgress:{value:0},uFade:{value:1},uPointScale:{value:1}},
+  vertexShader:`attribute vec3 aTarget;attribute float aSeed,aSize,aClass,aIntensity;uniform float uTime,uProgress,uFade,uPointScale;varying float vAlpha,vClass,vIntensity,vT;float sat(float x){return clamp(x,0.,1.);}float ease(float x){x=sat(x);return 1.-pow(1.-x,4.);}void main(){vec2 target=aTarget.xy;float rt=length(target),ang=atan(target.y,target.x);float delay=fract(aSeed*8.173+rt*.013)*.23+smoothstep(18.,74.,rt)*.055;float t=ease((uProgress-delay)/.62);float dir=step(.5,aSeed)*2.-1.;float spin=(1.-t)*dir*(4.5+aSeed*6.3);float sr=46.+rt*(1.30+aSeed*.72)+aSeed*28.;float rr=mix(sr,rt,t);vec2 p=vec2(cos(ang+spin),sin(ang+spin))*rr;float turb=1.-t;p+=vec2(sin(aSeed*71.+uTime*1.25+rr*.07),cos(aSeed*53.+uTime*1.05+rr*.06))*turb*(2.+aSeed*4.2);float settle=smoothstep(.91,1.,uProgress);p=mix(p,target,settle);float population=smoothstep(aSeed-.12,aSeed+.12,.11+.89*smoothstep(0.,.34,uProgress));vAlpha=population*mix(.08+.16*aIntensity,1.,t)*uFade;vClass=aClass;vIntensity=aIntensity;vT=t;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,aTarget.z,1.);gl_PointSize=(1.65+aSize*2.75+step(1.5,aClass)*.28)*uPointScale;}`,
+  fragmentShader:`varying float vAlpha,vClass,vIntensity,vT;void main(){vec2 q=gl_PointCoord-.5;float d=length(q);if(d>.5)discard;float core=1.-smoothstep(.10,.38,d);float edge=1.-smoothstep(.34,.50,d);vec3 charcoal=vec3(.055,.035,.033),maroon=vec3(.20,.028,.020),crimson=vec3(.78,.018,.010);vec3 fc=charcoal;if(vClass>.5)fc=maroon;if(vClass>1.5)fc=mix(vec3(.47,.018,.010),crimson,.55+.45*vIntensity);vec3 incoming=mix(vec3(.54,.50,.49),vec3(.40,.12,.09),step(.5,vClass));vec3 color=mix(incoming,fc,smoothstep(.18,.82,vT));color*=.86+core*.24;gl_FragColor=vec4(color,(core*.92+edge*.13)*vAlpha);}`});
+  scene.add(new THREE.Points(g,m));
+
+  function fit(){const a=innerWidth/Math.max(1,innerHeight),hh=50;camera.top=hh;camera.bottom=-hh;camera.left=-hh*a;camera.right=hh*a;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);m.uniforms.uPointScale.value=clamp(Math.sqrt((innerWidth*innerHeight)/(1600*900)),.78,1.22)}fit();addEventListener('resize',fit);
+
+  let sim=0,last=performance.now(),freeze=false;
+  const phase=p=>p<.06?'1. 공허':p<.30?'2. 빛 흡수':p<.56?'3. 실루엣 응축':p<.78?'4. 균열 점화':p<.96?'5. 형상 완성':'6. 최종 모습';
+  function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1000);last=now;if(!freeze)sim+=dt;let p=1,f=1;if(!freeze){if(sim<2.4)p=0;else if(sim<10.8)p=(sim-2.4)/8.4;else p=1;if(sim>16.5)f=clamp(1-(sim-16.5)/2.5,0,1);if(sim>=19.2){sim=0;p=0;f=1}}m.uniforms.uTime.value=sim;m.uniforms.uProgress.value=clamp(p);m.uniforms.uFade.value=f;document.getElementById('phase').textContent=freeze?'6. 최종 모습':phase(clamp(p));renderer.render(scene,camera)}requestAnimationFrame(frame);
+  document.getElementById('restart').onclick=()=>{sim=0;freeze=false;m.uniforms.uProgress.value=0;m.uniforms.uFade.value=1};
+  document.getElementById('final').onclick=()=>{freeze=true;m.uniforms.uProgress.value=1;m.uniforms.uFade.value=1;document.getElementById('phase').textContent='6. 최종 모습'};
+  document.getElementById('stats').textContent=N.toLocaleString()+' exact reference dots · unified inward absorption';
+}
+
+main().catch(e=>{console.error(e);const x=document.getElementById('error');x.style.display='grid';x.textContent='ERROR — '+e.message});
+</script>
+</body></html>
